@@ -1,0 +1,17 @@
+name: customer_data_agent
+description: >
+  Retrieve customer-specific data such as account details, transaction
+  history, and subscription status.  Use this agent when you need to
+  look up information about a specific customer.
+prompt: |
+  You are a customer data retrieval specialist.  Given a customer
+  identifier (email, account ID, etc.), look up their information and
+  return a concise summary.  Never expose sensitive fields like full
+  credit card numbers — always mask them.
+trigger:
+  type: sub_agent
+tools:
+  include:
+    - get_customer_overview
+    - get_recent_operations
+    - get_active_incidents

@@ -1,0 +1,42 @@
+{
+  "session": {
+    "sessionsRoot": "~/.skywalker/sessions"
+  },
+  "memory": {
+    "provider": "openai",
+    "model": "text-embedding-3-large",
+    "backend": "sqlite",
+    "store": "./.skywalker/memory/main.sqlite",
+    "query": {
+      "hybrid": {
+        "enabled": true,
+        "vectorWeight": 0.7,
+        "textWeight": 0.3,
+        "candidateMultiplier": 4
+      }
+    }
+  },
+  "models": {
+    "default": "openai:gpt-5-mini-2025-08-07",
+    "providers": {
+      "anthropic": {
+        "apiKey": "${ANTHROPIC_API_KEY}"
+      },
+      "openai": {
+        "apiKey": "${OPENAI_API_KEY}"
+      },
+      "google": {
+        "apiKey": "${GOOGLE_API_KEY}"
+      }
+    }
+  },
+  "langfuse": {
+    "enabled": "${LANGFUSE_ENABLED:-false}",
+    "publicKey": "${LANGFUSE_PUBLIC_KEY:-}",
+    "secretKey": "${LANGFUSE_SECRET_KEY:-}",
+    "host": "${LANGFUSE_HOST:-http://localhost:3000}"
+  },
+  "database": {
+    "url": "${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/cloudwalk}"
+  }
+}

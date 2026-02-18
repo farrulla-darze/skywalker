@@ -1,0 +1,31 @@
+{
+  "tests": [
+    {
+      "name": "01_base_agent_native_tools",
+      "description": "Base agent test: validate native tool usage (write/read/find) inside the sessionDir workspace.",
+      "default_question": "Create a file named native_tools_check.txt with the content 'native tools ok'. Then read the file back and confirm the content. Finally, list the files in the current workspace.",
+      "default_user_id": "client001",
+      "default_session_id": null,
+      "default_chat_url": "http://localhost:8000/chat",
+      "sessions_root": "~/.skywalker/sessions"
+    },
+    {
+      "name": "02_customer_data_active_incidents",
+      "description": "Base agent calling the customer_data_agent to retrieve active incidents for a specific customer.",
+      "default_question": "Use the customer_data agent to fetch active platform incidents (use get_active_incidents). Summarize the incidents clearly.",
+      "default_user_id": "client001",
+      "default_session_id": null,
+      "default_chat_url": "http://localhost:8000/chat",
+      "sessions_root": "~/.skywalker/sessions"
+    },
+    {
+      "name": "03_knowledge_agent_compare_stone_vs_infinitepay",
+      "description": "Base agent calling the knowledge_base_agent to compare Stone vs InfinitePay using both web_search and rag_search (vector DB).",
+      "default_question": "Compare Stone vs InfinitePay. Use web_search to fetch current public information, and also use rag_search in the 'infinitepay' namespace to ground the InfinitePay side from the vector database. Write the comparison to a file named compare.md and then present the key findings.",
+      "default_user_id": "client001",
+      "default_session_id": null,
+      "default_chat_url": "http://localhost:8000/chat",
+      "sessions_root": "~/.skywalker/sessions"
+    }
+  ]
+}
