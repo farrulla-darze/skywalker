@@ -4,7 +4,10 @@ This repository contains my implementation for the **Agent Swarm** challenge.
 
 The solution is a **FastAPI + PydanticAI** backend named **Skywalker** where a main router/orchestrator agent coordinates specialized sub-agents through in-process tool delegation. It features session persistence, RAG retrieval via Pinecone, customer support data tools backed by SQLite, and optional observability via Langfuse.
 
+Video de apresentação: https://drive.google.com/drive/folders/1y0cb4PgvLaeyy1paBycQ4UXcyMi80Ky7?usp=sharing
 ---
+
+
 
 ## Table of Contents
 
