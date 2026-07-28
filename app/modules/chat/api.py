@@ -48,10 +48,25 @@ def build_chat_service_from_state(state, session, settings) -> ChatService:
     Telegram polling loop (which has no Request)."""
     telegram_service = TelegramService(IntegrationsRepository(session), settings)
 
-    async def consultation_handler(chat_session, question: str, context: str) -> str:
+    async def consultation_handler(
+        chat_session, question: str, context: str, agent_label: str
+    ) -> str:
         """Human-in-the-loop: post the question on Telegram and block for the reply."""
+        # Resolve a human-readable customer display for the support message
+        customer_display = chat_session.user_id or chat_session.external_ref or "anônimo"
+        if chat_session.user_id:
+            from app.modules.auth.repository import AuthRepository
+
+            account = await AuthRepository(session).get_user_by_id(chat_session.user_id)
+            if account:
+                customer_display = f"{account.full_name} ({account.email})"
+
         consultation = await telegram_service.create_consultation(
-            chat_session, question, context
+            chat_session,
+            question,
+            context,
+            agent_label=agent_label,
+            customer_display=customer_display,
         )
         if consultation is None:
             return (
@@ -82,7 +97,6 @@ def build_chat_service_from_state(state, session, settings) -> ChatService:
         settings=settings,
         vector_store=getattr(state, "vector_store", None),
         graph_store=getattr(state, "graph_store", None),
-        escalation_handler=telegram_service.create_escalation,
         human_forward_handler=telegram_service.forward_to_human,
         consultation_handler=consultation_handler,
     )
@@ -159,14 +173,30 @@ async def send_message_streaming(
     user: CurrentUserDep,
 ):
     """SSE stream of a chat turn: live tool steps, token deltas, final message."""
-    service = build_chat_service(request, session, settings)
+    # Ownership check on the request-scoped session (cheap, fails fast)
     try:
-        chat_session = await service.get_owned_session(session_id, user.id)
+        await build_chat_service(request, session, settings).get_owned_session(
+            session_id, user.id
+        )
     except ChatServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
+    # The turn itself runs on a DEDICATED DB session so it survives client
+    # disconnects (closed tab, proxy timeout): messages persist and open human
+    # consultations are still consumed. The session closes when the pipeline
+    # ends (cleanup callback), not when the HTTP response ends.
+    own_session = request.app.state.db.session_factory()
+    try:
+        service = build_chat_service_from_state(request.app.state, own_session, settings)
+        chat_session = await service.get_owned_session(session_id, user.id)
+    except Exception:
+        await own_session.close()
+        raise
+
     async def sse() -> AsyncIterator[str]:
-        async for event in service.run_turn_streaming(chat_session, payload.content):
+        async for event in service.run_turn_streaming(
+            chat_session, payload.content, cleanup=own_session.close
+        ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

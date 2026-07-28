@@ -72,21 +72,24 @@ async def test_wait_times_out_when_no_answer(db):
     assert answered is None
 
 
-async def test_consult_tool_returns_human_answer_via_ctx_callback():
-    calls: list[tuple[str, str]] = []
+async def test_consult_tool_passes_agent_label_via_ctx_callback():
+    calls: list[tuple[str, str, str]] = []
 
-    async def fake_consult(question: str, context: str) -> str:
-        calls.append((question, context))
+    async def fake_consult(question: str, context: str, agent_label: str) -> str:
+        calls.append((question, context, agent_label))
         return "Human specialist replied: aprovado."
 
     ctx = ToolRunContext(
         settings=SETTINGS, user_ref="u1", session_id="s1", consult=fake_consult
     )
+    ctx.current_agent_label = "Customer Support Specialist"
     result = await CONSULT_SPEC.handler(
         ctx, ConsultHumanParams(question="Posso trocar o tier?", context="cliente Pro, R$80k/mês")
     )
     assert result == "Human specialist replied: aprovado."
-    assert calls == [("Posso trocar o tier?", "cliente Pro, R$80k/mês")]
+    assert calls == [
+        ("Posso trocar o tier?", "cliente Pro, R$80k/mês", "Customer Support Specialist")
+    ]
 
 
 async def test_consult_tool_degrades_without_channel():

@@ -49,7 +49,10 @@ def seed_users(cursor):
     users = [
         # Reference user for challenge scenarios
         ("client789", "João Silva Santos", "joao.silva@email.com", "+5511987654321", "active", "2025-01-15T10:30:00Z"),
-        
+
+        # Live demo user — paired via the app's own Telegram integration
+        ("1bdb59a2af274835b0e7aa2d50920e2f", "Rafael Farrulla", "farrullatech@gmail.com", "+5511998877665", "active", "2025-03-02T09:00:00Z"),
+
         # Additional 50+ users
         ("client001", "Maria Oliveira Costa", "maria.oliveira@email.com", "+5511912345678", "active", "2024-06-10T08:15:00Z"),
         ("client002", "Carlos Eduardo Lima", "carlos.lima@email.com", "+5521987654321", "active", "2024-07-22T14:20:00Z"),
@@ -125,7 +128,10 @@ def seed_merchants(cursor):
     merchants = [
         # Reference merchant for challenge scenarios
         ("mrc_10291", "client789", "Silva Comercio de Alimentos LTDA", "Mercadinho do Silva", "12.345.678/0001-90", "retail", "approved"),
-        
+
+        # Live demo merchant
+        ("mrc_20001", "1bdb59a2af274835b0e7aa2d50920e2f", "Farrulla Tech Servicos Digitais LTDA", "Farrulla Tech", "45.987.612/0001-33", "technology", "approved"),
+
         # Additional merchants
         ("mrc_10001", "client001", "Oliveira Confeccoes LTDA", "Loja da Maria", "23.456.789/0001-01", "retail", "approved"),
         ("mrc_10002", "client002", "Lima Tech Solutions LTDA", "TechStore Carlos", "34.567.890/0001-12", "technology", "approved"),
@@ -201,6 +207,7 @@ def seed_products_enabled(cursor):
     # Reference merchant with emprestimo disabled
     products = [
         ("mrc_10291", 1, 1, 1, 1, 1, 1, 0),
+        ("mrc_20001", 1, 1, 1, 1, 1, 1, 0),
     ]
     
     # Add products for all other merchants (most with all products enabled)
@@ -225,6 +232,7 @@ def seed_account_status(cursor):
     # Reference merchant with blocked transfers
     accounts = [
         ("mrc_10291", 15420.50, 3200.00, 0, "pending_kyc_review", "2026-02-10T14:30:00Z"),
+        ("mrc_20001", 8750.32, 1200.00, 0, "compliance_review", "2026-07-24T16:10:00Z"),
     ]
     
     # Add accounts for other merchants
@@ -255,6 +263,7 @@ def seed_auth_status(cursor):
     # Reference user with locked account
     auth_statuses = [
         ("client789", "2026-02-11T08:45:00Z", 5, 1, "too_many_failed_attempts"),
+        ("1bdb59a2af274835b0e7aa2d50920e2f", "2026-07-28T10:20:00Z", 0, 0, None),
     ]
     
     # Add auth status for other users
@@ -284,6 +293,7 @@ def seed_devices(cursor):
     # Reference device
     devices = [
         ("dev_4451", "mrc_10291", "smart_pos", "maquininha_smart", "active", "2025-01-20T10:00:00Z", "2026-02-12T18:30:00Z"),
+        ("dev_9001", "mrc_20001", "smart_pos", "maquininha_pro", "active", "2025-03-05T10:00:00Z", "2026-07-27T20:15:00Z"),
     ]
     
     # Add devices for merchants
@@ -326,6 +336,9 @@ def seed_transfers(cursor):
     transfers = [
         ("txf_blocked_001", "mrc_10291", 5000.00, "blocked", "account_blocked", "2026-02-11T15:20:00Z"),
         ("txf_success_001", "mrc_10291", 2500.00, "completed", None, "2026-02-09T11:30:00Z"),
+        ("txf_far_001", "mrc_20001", 1200.00, "blocked", "compliance_hold", "2026-07-24T16:05:00Z"),
+        ("txf_far_002", "mrc_20001", 940.15, "completed", None, "2026-07-20T09:30:00Z"),
+        ("txf_far_003", "mrc_20001", 3312.50, "completed", None, "2026-07-15T14:00:00Z"),
     ]
     
     # Add transfers for other merchants

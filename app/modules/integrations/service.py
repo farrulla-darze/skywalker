@@ -222,7 +222,12 @@ class TelegramService:
     CONSULTATION_POLL_SECONDS = 2.0
 
     async def create_consultation(
-        self, session: ChatSession, question: str, context: str
+        self,
+        session: ChatSession,
+        question: str,
+        context: str,
+        agent_label: str = "Agente",
+        customer_display: str | None = None,
     ) -> HumanConsultation | None:
         """Post one precise agent→human question to the support chat.
 
@@ -242,9 +247,10 @@ class TelegramService:
         )
         consultation = await self.repository.save_consultation(consultation)
 
+        customer = customer_display or session.user_id or session.external_ref or "anônimo"
         text = (
-            f"🤝 Consulta do agente · {consultation.id[:8]}\n"
-            f"Cliente: {session.user_id or session.external_ref}\n\n"
+            f"🤝 Consulta · {agent_label} · {consultation.id[:8]}\n"
+            f"Cliente: {customer}\n\n"
             f"Contexto:\n{context}\n\n"
             f"❓ Pergunta:\n{question}\n\n"
             f"↩️ Responda ESTA mensagem para enviar a resposta ao agente "

@@ -85,6 +85,7 @@ class AgentRunner:
         ctx: ToolRunContext,
     ) -> RunOutcome:
         steps: list[StepRecord] = []
+        ctx.current_agent_label = agent.name
         pyd_agent, prompt_client = self._build_agent(agent, ctx, steps, include_specialists=True)
 
         with self._prompt_link(prompt_client):
@@ -120,6 +121,7 @@ class AgentRunner:
         live step events fire through ``ctx.on_step_start`` / ``ctx.on_step_end``.
         """
         steps: list[StepRecord] = []
+        ctx.current_agent_label = agent.name
         pyd_agent, prompt_client = self._build_agent(agent, ctx, steps, include_specialists=True)
 
         text_parts: list[str] = []
@@ -252,6 +254,8 @@ class AgentRunner:
             sub_agent, sub_prompt = self._build_agent(
                 specialist, ctx, nested_steps, include_specialists=False
             )
+            previous_label = ctx.current_agent_label
+            ctx.current_agent_label = specialist.name
             try:
                 # Specialists run stateless on the delegated query; the router
                 # owns conversation continuity.
@@ -263,6 +267,8 @@ class AgentRunner:
                     "Specialist '%s' failed: %s", specialist.slug, exc, exc_info=True
                 )
                 result_text = f"Specialist '{specialist.slug}' failed: {exc}"
+            finally:
+                ctx.current_agent_label = previous_label
 
             duration_ms = int((time.monotonic() - start) * 1000)
             record = StepRecord(

@@ -27,9 +27,9 @@ from .schemas import ChatMessageRead, ChatSessionRead, FeedbackRead
 logger = logging.getLogger(__name__)
 
 # Callback types wired by the integrations module
-EscalationHandler = Callable[[ChatSession, str, str], Awaitable[str]]
 HumanForwardHandler = Callable[[ChatSession, str], Awaitable[None]]
-ConsultationHandler = Callable[[ChatSession, str, str], Awaitable[str]]
+# (session, question, context, agent_label) -> human's answer text
+ConsultationHandler = Callable[[ChatSession, str, str, str], Awaitable[str]]
 EmitFn = Callable[[dict], Awaitable[None]]
 
 _HANDOFF_ACK = (
@@ -53,7 +53,6 @@ class ChatService:
         guardrail_service: GuardrailService | None = None,
         vector_store=None,
         graph_store=None,
-        escalation_handler: EscalationHandler | None = None,
         human_forward_handler: HumanForwardHandler | None = None,
         consultation_handler: ConsultationHandler | None = None,
     ) -> None:
@@ -64,7 +63,6 @@ class ChatService:
         self.guardrail_service = guardrail_service or GuardrailService(settings)
         self.vector_store = vector_store
         self.graph_store = graph_store
-        self.escalation_handler = escalation_handler
         self.human_forward_handler = human_forward_handler
         self.consultation_handler = consultation_handler
 
@@ -145,13 +143,23 @@ class ChatService:
             return result
 
     async def run_turn_streaming(
-        self, session: ChatSession, content: str
+        self,
+        session: ChatSession,
+        content: str,
+        cleanup: Callable[[], Awaitable[None]] | None = None,
     ) -> AsyncIterator[dict]:
         """Streaming variant of the turn pipeline, yielding SSE-ready events.
 
         Event types: step_started, step_finished, token, revised, done, error.
         The pipeline runs as a task pushing into a queue so tool events surface
         live while the model is still working.
+
+        Disconnect resilience: if the SSE consumer goes away mid-turn (closed
+        tab, proxy timeout), the pipeline is NOT cancelled — it finishes in the
+        background so messages persist and any open human consultation is still
+        consumed. For that to be safe the service must be built on a DEDICATED
+        DB session whose closure is passed as *cleanup* (invoked when the
+        pipeline actually ends), not on a request-scoped session.
         """
         queue: asyncio.Queue[dict | None] = asyncio.Queue()
 
@@ -187,6 +195,11 @@ class ChatService:
                 await emit({"type": "error", "detail": str(exc)})
             finally:
                 await queue.put(None)  # sentinel
+                if cleanup is not None:
+                    try:
+                        await cleanup()
+                    except Exception:  # noqa: BLE001
+                        logger.debug("Streaming cleanup failed", exc_info=True)
 
         task = asyncio.create_task(pipeline())
         try:
@@ -195,8 +208,14 @@ class ChatService:
                 if event is None:
                     break
                 yield event
-        finally:
             await task
+        finally:
+            if not task.done():
+                # Consumer disconnected mid-turn — detach, don't cancel.
+                logger.warning(
+                    "SSE client disconnected; turn for session %s continues in background",
+                    session.id,
+                )
 
     async def _run_turn(
         self,
@@ -263,7 +282,6 @@ class ChatService:
             session_id=session.id,
             vector_store=self.vector_store,
             graph_store=self.graph_store,
-            escalate=self._make_escalate(session),
             consult=self._make_consult(session),
             on_step_start=(
                 (lambda tool, args: emit({"type": "step_started", "tool": tool, "args": args}))
@@ -352,26 +370,13 @@ class ChatService:
             raise ChatServiceError("No enabled router agent configured", 503)
         return router
 
-    def _make_escalate(self, session: ChatSession):
-        handler = self.escalation_handler
-        if handler is None:
-            return None
-
-        async def escalate(reason: str, summary: str) -> str:
-            result = await handler(session, reason, summary)
-            session.handoff_state = HandoffState.PENDING_HUMAN
-            await self.repository.save_session(session)
-            return result
-
-        return escalate
-
     def _make_consult(self, session: ChatSession):
         """Human-in-the-loop consultation — the agent stays in charge (no handoff)."""
         handler = self.consultation_handler
         if handler is None:
             return None
 
-        async def consult(question: str, context: str) -> str:
-            return await handler(session, question, context)
+        async def consult(question: str, context: str, agent_label: str) -> str:
+            return await handler(session, question, context, agent_label)
 
         return consult

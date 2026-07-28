@@ -9,7 +9,12 @@ async def test_system_agents_are_seeded(client, auth_headers):
     response = await client.get("/api/v1/agents", headers=auth_headers)
     assert response.status_code == 200
     slugs = {a["slug"] for a in response.json()}
-    assert {"sky-router", "customer-support"} <= slugs
+    assert {
+        "sky-router",
+        "knowledge-specialist",
+        "customer-support",
+        "account-operations",
+    } <= slugs
 
 
 async def test_tool_catalog_is_exposed(client, auth_headers):
@@ -23,7 +28,10 @@ async def test_tool_catalog_is_exposed(client, auth_headers):
         "get_customer_overview",
         "get_recent_operations",
         "get_active_incidents",
-        "escalate_to_human",
+        "consult_human",
+        "release_transfer",
+        "set_transfers_enabled",
+        "set_product_enabled",
     } <= names
 
 

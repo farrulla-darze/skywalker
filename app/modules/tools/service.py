@@ -38,11 +38,13 @@ class ToolRunContext:
     session_id: str
     vector_store: QdrantVectorStore | None = None
     graph_store: Neo4jGraphStore | None = None
-    # Callback wired by the chat service: (reason, summary) -> confirmation text
-    escalate: Callable[[str, str], Awaitable[str]] | None = None
-    # Human-in-the-loop consultation: (question, context) -> human's answer text.
-    # Blocks the turn until the support staff replies on Telegram (or timeout).
-    consult: Callable[[str, str], Awaitable[str]] | None = None
+    # Human-in-the-loop consultation: (question, context, agent_label) -> human's
+    # answer text. Blocks the turn until the support staff replies on Telegram
+    # (or timeout). agent_label names WHICH agent is asking, for the message.
+    consult: Callable[[str, str, str], Awaitable[str]] | None = None
+    # Display name of the agent currently executing (router or specialist);
+    # maintained by the runner so tool handlers can attribute their actions.
+    current_agent_label: str = ""
     # Streaming hooks (wired by the SSE pipeline): fire as each tool runs so
     # the frontend can show live progress during the "thinking" phase.
     on_step_start: Callable[[str, dict[str, Any] | None], Awaitable[None]] | None = None
@@ -96,7 +98,14 @@ class ToolRegistry:
 
 def build_default_registry() -> ToolRegistry:
     """Assemble the built-in tool catalog."""
-    from .definitions import escalation, graph_search, rag_search, support_db, web_search
+    from .definitions import (
+        account_ops,
+        escalation,
+        graph_search,
+        rag_search,
+        support_db,
+        web_search,
+    )
 
     registry = ToolRegistry()
     registry.register(rag_search.SPEC)
@@ -104,6 +113,7 @@ def build_default_registry() -> ToolRegistry:
     registry.register(graph_search.SPEC)
     for spec in support_db.SPECS:
         registry.register(spec)
-    registry.register(escalation.SPEC)
+    for spec in account_ops.SPECS:
+        registry.register(spec)
     registry.register(escalation.CONSULT_SPEC)
     return registry

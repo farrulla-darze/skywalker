@@ -1,4 +1,12 @@
-"""escalate_to_human — hand the conversation off to a human support agent."""
+"""consult_human — the single human-in-the-loop channel.
+
+The agent stays in charge of the conversation: it posts ONE precise question
+(with gathered context) to the support staff on Telegram, blocks until the
+reply (or timeout), and uses the answer to respond to the customer. Follow-up
+rounds are additional calls. There is no full-handoff tool: even an explicit
+"quero falar com um humano" is served by consulting the specialist and
+relaying their words.
+"""
 
 import logging
 
@@ -8,41 +16,6 @@ from ..enums import ToolCategory
 from ..service import ToolRunContext, ToolSpec
 
 logger = logging.getLogger(__name__)
-
-
-class EscalateParams(BaseModel):
-    reason: str = Field(description="Why this conversation needs a human (short)")
-    summary: str = Field(
-        description="Concise summary of the customer's problem and what was already tried"
-    )
-
-
-async def _handler(ctx: ToolRunContext, params: EscalateParams) -> str:
-    if ctx.escalate is None:
-        return (
-            "Escalation channel is not configured. Tell the customer a human will "
-            "follow up and suggest contacting official support channels."
-        )
-    try:
-        return await ctx.escalate(params.reason, params.summary)
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Escalation failed: %s", exc, exc_info=True)
-        return f"Escalation failed: {exc}"
-
-
-SPEC = ToolSpec(
-    name="escalate_to_human",
-    label="Escalate to Human",
-    description=(
-        "Escalate this conversation to a human support agent. Use when the customer "
-        "explicitly asks for a human, when the issue involves account blocks/money that "
-        "you cannot resolve, or when you are not confident in the answer. After calling "
-        "this, tell the customer a human agent will take over."
-    ),
-    category=ToolCategory.ACTION,
-    params_model=EscalateParams,
-    handler=_handler,
-)
 
 
 class ConsultHumanParams(BaseModel):
@@ -66,10 +39,12 @@ async def _consult_handler(ctx: ToolRunContext, params: ConsultHumanParams) -> s
     if ctx.consult is None:
         return (
             "Human consultation channel is not configured. Do not invent an answer: "
-            "tell the customer a specialist needs to review this and offer escalation."
+            "tell the customer a specialist needs to review this and will follow up."
         )
     try:
-        return await ctx.consult(params.question, params.context)
+        return await ctx.consult(
+            params.question, params.context, ctx.current_agent_label or "Agente"
+        )
     except Exception as exc:  # noqa: BLE001
         logger.error("Human consultation failed: %s", exc, exc_info=True)
         return f"Human consultation failed: {exc}"
@@ -83,10 +58,12 @@ CONSULT_SPEC = ToolSpec(
         "their reply, while you stay in charge of the conversation. Use when an action "
         "requires human permission (editing customer data, verifying extra-private "
         "information, changing product tiers/plans, applying discounts or fee "
-        "exceptions) or when you are not confident about a complex, high-stakes "
-        "answer. Gather context with your other tools FIRST, then ask. If the reply "
-        "asks for more context or is insufficient, call again as a follow-up. Use the "
-        "final answer to respond to the customer in your own words."
+        "exceptions, releasing money held by compliance/fraud review) or when you are "
+        "not confident about a complex, high-stakes answer — including when the "
+        "customer explicitly asks for a human. Gather context with your other tools "
+        "FIRST, then ask. If the reply asks for more context or is insufficient, call "
+        "again as a follow-up. Use the final answer to respond to the customer in your "
+        "own words."
     ),
     category=ToolCategory.ACTION,
     params_model=ConsultHumanParams,

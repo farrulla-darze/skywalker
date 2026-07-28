@@ -20,8 +20,10 @@ function stepLabel(tool: string): string {
     get_customer_overview: "consultando dados da conta",
     get_recent_operations: "consultando operações recentes",
     get_active_incidents: "verificando incidentes ativos",
-    escalate_to_human: "acionando atendimento humano",
     consult_human: "consultando especialista humano",
+    release_transfer: "liberando transferência",
+    set_transfers_enabled: "atualizando status de transferências",
+    set_product_enabled: "atualizando produtos da conta",
   };
   return labels[tool] ?? tool;
 }
