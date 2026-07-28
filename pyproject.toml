@@ -1,48 +1,70 @@
 [build-system]
-requires = ["setuptools>=68.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "skywalker"
-version = "0.1.0"
-description = "Skywalker Customer Support Agent System"
-authors = [
-    {name = "Farrulla", email = "farrullatech@gmail.com"}
-]
+version = "0.2.0"
+description = "Skywalker — multi-agent customer support platform (FastAPI backend + React frontend)"
+authors = [{ name = "Farrulla", email = "farrullatech@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pydantic-ai>=0.0.14",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
-    "langfuse>=2.0.0",
-    "docker>=7.0.0",
-    "openai>=1.54.0",
-    "anthropic>=0.39.0",
-    "httpx>=0.27.0",
-    "python-dotenv>=1.0.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "sqlalchemy>=2.0.0",
+    "pydantic>=2.8.0",
+    "pydantic-settings>=2.4.0",
+    "pydantic-ai>=1.58.0",
+    "sqlalchemy[asyncio]>=2.0.30",
     "asyncpg>=0.29.0",
     "aiosqlite>=0.20.0",
-    "numpy>=1.26.0",
-    "scikit-learn>=1.5.0",
-    "tiktoken>=0.7.0",
-    "slack-sdk>=3.33.0",
-    "google-generativeai>=0.8.0",
-    "pinecone>=5.0.0",
-    "crawl4ai>=0.4.0",
-    "pyyaml>=6.0.0",
-    "pytest-asyncio (>=1.3.0,<2.0.0)",
-    "ddgs (>=9.10.0,<10.0.0)",
+    "pyjwt>=2.9.0",
+    "bcrypt>=4.2.0",
+    "email-validator>=2.2.0",
+    "qdrant-client>=1.12.0",
+    "neo4j>=5.25.0",
+    "openai>=1.54.0",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.0",
+    "ddgs>=9.10.0",
+    "trafilatura>=1.12.0",
+    "langfuse>=4.0.0",
+    # RAGAS evaluators — no cp314 wheels yet, so restricted to the runtime
+    # image (python 3.12); the 3.14 dev venv skips them (lazy-imported).
+    "ragas>=0.4.3,<0.5; python_version < '3.13'",
+    "langchain-community<0.4; python_version < '3.13'",
+    "langchain-openai>=0.2; python_version < '3.13'",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0.0"]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "asgi-lifespan>=2.1.0",
+    "ruff>=0.6.0",
+    "black>=24.8.0",
+    "mypy>=1.11.0",
+]
+
+[tool.poetry]
+packages = [{ include = "app" }]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+check_untyped_defs = true

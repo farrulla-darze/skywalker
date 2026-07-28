@@ -1,0 +1,77 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #101012;
+  --color-surface: #17171a;
+  --color-raised: #1e1e22;
+  --color-hover: #232327;
+  --color-line: #2a2a2f;
+  --color-fg: #ececea;
+  --color-mut: #8e8e93;
+  --color-faint: #5f5f66;
+  --color-clay: #cb5d4b;
+  --color-clay-soft: #cb5d4b26;
+  --color-ok: #5ba97e;
+  --color-warn: #d9a45b;
+
+  --font-ui: "Instrument Sans", system-ui, -apple-system, sans-serif;
+  --font-serifd: "Newsreader", Georgia, serif;
+  --font-monoui: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+}
+
+body {
+  @apply bg-ink text-fg font-ui antialiased;
+  font-size: 15px;
+}
+
+::selection {
+  background: var(--color-clay-soft);
+}
+
+/* Quiet scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+/* Breathing dot for active tool steps */
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.dot-live {
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+/* Step line entrance */
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.step-in {
+  animation: step-in 0.25s ease-out;
+}
+
+/* Streaming caret */
+@keyframes caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.caret::after {
+  content: "▍";
+  color: var(--color-clay);
+  animation: caret 0.9s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-live, .step-in, .caret::after {
+    animation: none;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-clay);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

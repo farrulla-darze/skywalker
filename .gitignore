@@ -1,46 +1,29 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual Environment
+build/
+dist/
 .venv/
 venv/
-ENV/
-env/
 
-# Environment variables
+# Environment
 .env
 .env.local
 
-# IDE
+# App data
+skywalker.db
+db/support_db/support.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# IDE / OS
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-
-
-# OS
 .DS_Store
-Thumbs.db
+*.swp
 
 # Logs
 *.log
@@ -48,14 +31,3 @@ logs/
 
 # Docker
 docker-compose.override.yml
-
-# Temporary files
-*.tmp
-*.temp
-
-# Scripts
-scripts/
-
-# Docs
-docs/
-examples/
