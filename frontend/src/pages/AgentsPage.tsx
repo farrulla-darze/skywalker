@@ -117,15 +117,15 @@ export default function AgentsPage() {
         </button>
       </div>
 
-      <div className="grid gap-3">
+      <div className="flex flex-col gap-3">
         {agents.map((agent) => (
           <div
             key={agent.id}
-            className="flex items-start justify-between rounded-xl border border-line bg-surface p-4"
+            className="flex w-full min-w-0 items-start justify-between overflow-hidden rounded-xl border border-line bg-surface p-4"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{agent.name}</span>
+                <span className="min-w-0 truncate font-medium">{agent.name}</span>
                 <span className="rounded bg-raised px-2 py-0.5 text-[10px] uppercase text-mut">
                   {agent.kind}
                 </span>
@@ -145,7 +145,7 @@ export default function AgentsPage() {
                 {agent.tools.map((tool) => (
                   <span
                     key={tool}
-                    className="rounded bg-ok/15 px-2 py-0.5 text-[11px] text-ok"
+                    className="max-w-full truncate rounded bg-ok/15 px-2 py-0.5 text-[11px] text-ok"
                   >
                     🔧 {tool}
                   </span>

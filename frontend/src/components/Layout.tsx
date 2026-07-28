@@ -104,7 +104,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <SessionsProvider>
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
-        <main className="min-w-0 flex-1 overflow-auto">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">{children}</main>
       </div>
     </SessionsProvider>
   );
