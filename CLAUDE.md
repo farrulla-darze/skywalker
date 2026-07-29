@@ -301,6 +301,12 @@ Only required for:
 - public endpoint changes
 - data model changes
 
+### Documentation
+
+Before committing, check whether the change affects anything documented in `README.md` (architecture
+diagrams, API table, event types, env vars, known limitations, setup steps, etc.). If it does, update the
+relevant section(s) in the same commit — do not let the README drift from what the code actually does.
+
 ### Before Opening a PR
 
 ```bash
