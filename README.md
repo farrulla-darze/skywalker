@@ -1,16 +1,11 @@
 # Skywalker — Plataforma Multi-Agente de Suporte (desafio Getnet)
 
-Solução para o desafio técnico **"AI Hardcore Engineer — Multi-Agent Support System"** da Getnet/CloudWalk
+Solução para o desafio técnico **"AI Hardcore Engineer — Multi-Agent Support System"** da Getnet
 ([enunciado completo](getnet_challenge.md)). É um monorepo **FastAPI + PydanticAI** (backend) e **React**
 (frontend) onde um agente roteador orquestra três especialistas, com RAG local (**Qdrant**), knowledge
 graph opcional (**Neo4j**), golden dataset com avaliação versionada (**Langfuse**), guardrails no caminho
 de produção e escalação humana real via **Telegram** — sem ngrok, sem túnel, funcionando no `localhost`.
 
-> O diagnóstico técnico que motivou a reescrita atual (bugs da v1, decisões de arquitetura, plano de
-> execução) está em [REVIEW_AND_ROADMAP.md](REVIEW_AND_ROADMAP.md). Esse documento descreve uma versão
-> **anterior** do código (`src/modules`); a base atual vive em `app/` e resolveu os pontos P0 listados lá.
-> O enunciado original da CloudWalk (antecessor deste desafio, mesma estrutura) está em
-> [cloudwalk_challenge.md](cloudwalk_challenge.md).
 
 ---
 
@@ -238,6 +233,13 @@ editáveis em runtime — e o Langfuse pode sobrepor a versão servida sem redep
   bate com marcadores sensíveis (cpf/cnpj/senha/token), senão também fail-open. Guardrails são
   desabilitados por padrão localmente (`GUARDRAILS_ENABLED=true` no `.env.example` do compose) e podem
   ser ligados/desligados por config sem redeploy de código.
+- **Modelo de guardrail e timeouts:** `GUARDRAIL_MODEL` (default `openai:gpt-4.1-mini`) é
+  deliberadamente um modelo **não-reasoning** — um modelo de reasoning (ex. `gpt-5-mini`) pode "pensar"
+  por vários minutos num veredito ALLOW/BLOCK trivial (chegamos a observar uma chamada única de guardrail
+  travando um turno inteiro do Telegram por mais de 10 minutos antes desse ajuste). Todo request a modelo
+  (router, especialistas e guardrails) tem timeout configurável (`LLM_REQUEST_TIMEOUT_SECONDS`,
+  `GUARDRAIL_TIMEOUT_SECONDS`) via `ModelSettings(timeout=...)`, que cai nos mesmos caminhos de
+  fail-open/fail-closed acima em vez de travar indefinidamente.
 
 ---
 
@@ -357,7 +359,9 @@ te-lo é literalmente uma conversa dentro do app do Telegram:
 5. **Converse com o bot normalmente** — mande qualquer uma das perguntas de exemplo do enunciado (ex.:
    *"What's the difference between the Get Clássica and the Get Smart?"*). Em ~1s o polling entrega a
    mensagem, o agente processa (router → especialista → resposta) e a resposta chega no seu Telegram —
-   é o mesmo agente e o mesmo backend do chat web, só por outro canal.
+   é o mesmo agente e o mesmo backend do chat web, só por outro canal. O Telegram mostra "digitando…"
+   enquanto o turno roda; se o turno estourar `TELEGRAM_TURN_TIMEOUT_SECONDS`, o bot responde com uma
+   mensagem de fallback em vez de deixar o cliente sem retorno.
 6. **Para testar a escalação humana:** em qualquer chat do Telegram (pode ser o mesmo ou outro), envie
    `/support_here` — esse chat vira o "chat de suporte" que recebe as consultas do `consult_human`. Peça
    algo que force uma consulta (ex.: *"preciso de um desconto na taxa"* ou *"libera minha transferência
@@ -592,6 +596,9 @@ funcional — **a única credencial que você precisa obter fora do repositório
 | Token do bot do Telegram | Só se for testar essa integração | Não vai no `.env` — é colado na tela **Integrações** do frontend, por usuário. Ver [Telegram](#telegram-canal-de-chat-e-escalação) para como conseguir um em minutos via `@BotFather` |
 | `GRAPH_ENABLED` | Não (default `false`) | Ligue para habilitar `graph_search`/extração de fatos; requer Neo4j de pé (já incluso no compose) |
 | `GUARDRAILS_ENABLED` | Não | Liga/desliga guardrails sem redeploy |
+| `GUARDRAIL_MODEL` | Não (default `openai:gpt-4.1-mini`) | Modelo não-reasoning para os vereditos de guardrail — reasoning models podem travar minutos num veredito trivial |
+| `LLM_REQUEST_TIMEOUT_SECONDS` / `GUARDRAIL_TIMEOUT_SECONDS` | Não (default `120` / `30`) | Timeout por chamada de modelo (router/especialistas / guardrails); estoura para os caminhos fail-open/fail-closed existentes |
+| `TELEGRAM_TURN_TIMEOUT_SECONDS` | Não (default `300`, elevado em runtime para `CONSULTATION_TIMEOUT_SECONDS + 120` se for maior) | Teto máximo de um turno no Telegram; ao estourar, envia uma mensagem de fallback em vez de deixar o cliente sem resposta |
 | `LANGFUSE_ENABLED` | Não | Liga/desliga toda a instrumentação de tracing/scores/prompt management |
 | `ALLOW_ANONYMOUS_CHAT` | Não (default `true`) | Desligue para exigir JWT também no endpoint `/chat` legado |
 

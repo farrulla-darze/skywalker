@@ -58,6 +58,10 @@ class TelegramClient:
             parse_mode=parse_mode,
         )
 
+    async def send_chat_action(self, chat_id: int, action: str = "typing") -> None:
+        """Show a status indicator in the chat (Telegram clears it after ~5s)."""
+        await self._call("sendChatAction", chat_id=chat_id, action=action)
+
     async def answer_callback_query(self, callback_query_id: str, text: str = "") -> None:
         await self._call("answerCallbackQuery", callback_query_id=callback_query_id, text=text)
 

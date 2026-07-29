@@ -31,6 +31,7 @@ from pydantic_ai.messages import (
     TextPart,
     UserPromptPart,
 )
+from pydantic_ai.settings import ModelSettings
 
 from app.core.config import Settings
 from app.modules.tools.schemas import StepRecord
@@ -164,6 +165,7 @@ class AgentRunner:
         pyd_agent = PydanticAgent(
             model=model,
             instructions=(instructions, self._runtime_context(ctx)),
+            model_settings=ModelSettings(timeout=self.settings.llm_request_timeout_seconds),
         )
 
         for tool_name in agent.tools or []:

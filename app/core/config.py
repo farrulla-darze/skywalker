@@ -37,14 +37,25 @@ class Settings(BaseSettings):
     # --- LLM -------------------------------------------------------------
     openai_api_key: str | None = None
     default_model: str = "openai:gpt-5-mini"
-    guardrail_model: str = "openai:gpt-5-mini"
+    # Guardrails are simple ALLOW/BLOCK judges — same rationale as ragas_model:
+    # a reasoning model can stall for minutes "thinking" on one (observed 10min+
+    # on a single output-guardrail call).
+    guardrail_model: str = "openai:gpt-4.1-mini"
     guardrails_enabled: bool = False
     # RAGAS judge — a non-reasoning model: reasoning models burn the token
     # budget before emitting the structured judge output (IncompleteOutput).
     ragas_model: str = "gpt-4.1-mini"
+    # Per-request LLM timeouts (seconds). The OpenAI client retries twice on
+    # timeout, so worst-case wall time per logical call is ~3x these values.
+    llm_request_timeout_seconds: int = 120
+    guardrail_timeout_seconds: int = 30
     # How long a chat turn blocks waiting for the human's Telegram reply in a
     # consult_human round before telling the customer a specialist will follow up.
     consultation_timeout_seconds: int = 120
+    # Hard cap on one Telegram turn (webhook or polling). The effective cap is
+    # raised at runtime to consultation_timeout_seconds + 120 if that is larger,
+    # so consult_human rounds are never cut off.
+    telegram_turn_timeout_seconds: int = 300
 
     # --- RAG / vector store (Qdrant) -------------------------------------
     qdrant_url: str = "http://localhost:6333"

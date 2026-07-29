@@ -10,6 +10,7 @@ Telegram plays two roles:
 Handoff FSM:  bot → pending_human → human → bot
 """
 
+import asyncio
 import logging
 import secrets
 import uuid
@@ -279,8 +280,6 @@ class TelegramService:
         task (webhook request or polling loop), so the waiting turn must not
         reuse its own session's identity map.
         """
-        import asyncio
-
         deadline = asyncio.get_event_loop().time() + timeout_seconds
         while asyncio.get_event_loop().time() < deadline:
             await asyncio.sleep(self.CONSULTATION_POLL_SECONDS)
@@ -361,8 +360,38 @@ class TelegramService:
                     title="Telegram conversation",
                 )
             )
-        reply_text = await run_agent_turn(session, text)
+        # Effective cap never undercuts a consult_human round (which can hold
+        # the turn for consultation_timeout_seconds waiting on the human).
+        turn_cap = max(
+            self.settings.telegram_turn_timeout_seconds,
+            self.settings.consultation_timeout_seconds + 120,
+        )
+        typing_task = asyncio.create_task(self._typing_loop(client, chat_id))
+        try:
+            reply_text = await asyncio.wait_for(run_agent_turn(session, text), timeout=turn_cap)
+        except TimeoutError:
+            logger.error(
+                "Telegram turn exceeded %ss for session %s — sending fallback",
+                turn_cap,
+                session.id,
+            )
+            reply_text = (
+                "Desculpe, estou demorando mais que o normal para responder. "
+                "Pode tentar novamente em instantes?"
+            )
+        finally:
+            typing_task.cancel()
         await client.send_message(chat_id, reply_text)
+
+    @staticmethod
+    async def _typing_loop(client: TelegramClient, chat_id: int) -> None:
+        """Keep Telegram's 'typing…' indicator alive while the agent works."""
+        while True:
+            try:
+                await client.send_chat_action(chat_id, "typing")
+            except Exception:  # noqa: BLE001 — indicator is best-effort
+                pass
+            await asyncio.sleep(4.5)
 
     async def _handle_start(
         self, integration: TelegramIntegration, chat_id: int, text: str

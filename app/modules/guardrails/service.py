@@ -11,6 +11,7 @@ Policy:
 import logging
 
 from pydantic_ai import Agent as PydanticAgent
+from pydantic_ai.settings import ModelSettings
 
 from app.core.config import Settings
 
@@ -65,6 +66,7 @@ class GuardrailService:
             model=self.settings.guardrail_model,
             instructions=instructions,
             output_type=GuardrailVerdict,
+            model_settings=ModelSettings(timeout=self.settings.guardrail_timeout_seconds),
         )
 
     async def validate_input(self, user_message: str) -> GuardrailVerdict:
