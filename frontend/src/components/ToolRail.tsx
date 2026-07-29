@@ -8,6 +8,8 @@ export interface LiveStep {
   duration_ms?: number;
   running: boolean;
   nested_steps?: StepRecord[] | null;
+  /** True when this step ran inside a delegated specialist (`agent:` step). */
+  nested?: boolean;
 }
 
 function stepLabel(tool: string): string {
@@ -83,6 +85,7 @@ export default function ToolRail({
           <div
             key={i}
             className="step-in flex items-baseline gap-2 py-0.5 font-monoui text-[12px]"
+            style={step.nested ? { marginLeft: 14 } : undefined}
           >
             <span className={step.running ? "dot-live text-clay" : "text-ok"}>
               {step.running ? "●" : "✓"}

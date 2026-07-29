@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api, apiStream } from "../api/client";
 import type { ChatMessageRead, ChatSessionRead, StepRecord } from "../api/types";
 import ChatInput from "../components/ChatInput";
+import MessageBody from "../components/MessageBody";
 import MessageActions from "../components/MessageActions";
 import SessionRating from "../components/SessionRating";
 import ToolRail, { type LiveStep } from "../components/ToolRail";
@@ -18,6 +19,14 @@ const SUGGESTIONS = [
 interface StreamingState {
   steps: LiveStep[];
   text: string;
+}
+
+/** A step that fires while an `agent:` delegate step is still running belongs to it. */
+function isSubStep(tool: string, steps: LiveStep[]): boolean {
+  return (
+    !tool.startsWith("agent:") &&
+    steps.some((st) => st.running && st.tool.startsWith("agent:"))
+  );
 }
 
 export default function ChatPage() {
@@ -93,6 +102,7 @@ export default function ChatPage() {
                   tool: event.tool as string,
                   args: event.args as Record<string, unknown> | null,
                   running: true,
+                  nested: isSubStep(event.tool as string, s.steps),
                 },
               ],
             },
@@ -111,6 +121,10 @@ export default function ChatPage() {
               duration_ms: event.duration_ms as number,
               nested_steps: (event.nested_steps as StepRecord[]) ?? null,
               running: false,
+              nested:
+                idx >= 0
+                  ? steps[idx].nested
+                  : isSubStep(event.tool as string, steps),
             };
             if (idx >= 0) steps[idx] = finished;
             else steps.push(finished);
@@ -192,6 +206,8 @@ export default function ChatPage() {
               key={message.id}
               message={message}
               onChanged={() => sessionId && void loadMessages(sessionId)}
+              onSuggestionClick={(text) => void send(text)}
+              suggestionsDisabled={streaming !== null}
             />
           ))}
 
@@ -202,9 +218,7 @@ export default function ChatPage() {
                 running={streaming.text === ""}
               />
               {streaming.text && (
-                <div className="caret whitespace-pre-wrap text-[15px] leading-7 text-fg">
-                  {streaming.text}
-                </div>
+                <MessageBody content={streaming.text} caret />
               )}
             </div>
           )}
@@ -222,9 +236,13 @@ export default function ChatPage() {
 function MessageRow({
   message,
   onChanged,
+  onSuggestionClick,
+  suggestionsDisabled,
 }: {
   message: ChatMessageRead;
   onChanged: () => void;
+  onSuggestionClick: (text: string) => void;
+  suggestionsDisabled: boolean;
 }) {
   if (message.role === "user") {
     return (
@@ -256,9 +274,11 @@ function MessageRow({
         </div>
       )}
       <ToolRail steps={steps} running={false} totalMs={totalMs || undefined} />
-      <div className="whitespace-pre-wrap text-[15px] leading-7 text-fg">
-        {message.content}
-      </div>
+      <MessageBody
+        content={message.content}
+        onSuggestionClick={onSuggestionClick}
+        disabled={suggestionsDisabled}
+      />
       {!isHuman && <MessageActions message={message} onChanged={onChanged} />}
     </div>
   );
