@@ -32,7 +32,7 @@ from .schemas import (
     ReviewFlagCreate,
     SessionScoreCreate,
 )
-from .service import ChatService, ChatServiceError
+from .service import ChatService, ChatServiceError, EmitFn
 
 chat_router = APIRouter(prefix="/chat", tags=["chat"])
 legacy_router = APIRouter(tags=["legacy"])
@@ -49,9 +49,22 @@ def build_chat_service_from_state(state, session, settings) -> ChatService:
     telegram_service = TelegramService(IntegrationsRepository(session), settings)
 
     async def consultation_handler(
-        chat_session, question: str, context: str, agent_label: str
+        chat_session,
+        question: str,
+        context: str,
+        agent_label: str,
+        emit: EmitFn | None = None,
     ) -> str:
-        """Human-in-the-loop: post the question on Telegram and block for the reply."""
+        """Human-in-the-loop: post the question on Telegram and block for the reply.
+
+        When *emit* is set (streaming turns), consultation progress is pushed to
+        the chat UI: waiting (with elapsed seconds), answered, or timeout.
+        """
+
+        async def notify(event: dict) -> None:
+            if emit is not None:
+                await emit(event)
+
         # Resolve a human-readable customer display for the support message
         customer_display = chat_session.user_id or chat_session.external_ref or "anônimo"
         if chat_session.user_id:
@@ -74,15 +87,33 @@ def build_chat_service_from_state(state, session, settings) -> ChatService:
                 "no support chat set via /support_here). Do NOT invent an answer: tell "
                 "the customer this needs a specialist and offer escalate_to_human."
             )
+        await notify({"type": "consultation", "status": "waiting", "elapsed_s": 0})
+
+        async def on_wait_tick(elapsed: float) -> None:
+            await notify(
+                {"type": "consultation", "status": "waiting", "elapsed_s": int(elapsed)}
+            )
+
         answered = await telegram_service.wait_for_consultation_answer(
-            consultation.id, state.db.session_factory, settings.consultation_timeout_seconds
+            consultation.id,
+            state.db.session_factory,
+            settings.consultation_timeout_seconds,
+            on_wait_tick=on_wait_tick,
         )
         if answered is None:
+            await notify({"type": "consultation", "status": "timeout"})
             return (
                 f"No human reply within {settings.consultation_timeout_seconds}s "
                 f"(consultation {consultation.id[:8]} stays open). Tell the customer a "
                 "specialist will follow up shortly; do not guess the answer."
             )
+        await notify(
+            {
+                "type": "consultation",
+                "status": "answered",
+                "answered_by": answered.answered_by,
+            }
+        )
         return (
             f"Human specialist (@{answered.answered_by}) replied:\n{answered.answer}\n\n"
             "If this settles the matter, use it to answer the customer (in your own "

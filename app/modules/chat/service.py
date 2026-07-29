@@ -28,9 +28,16 @@ logger = logging.getLogger(__name__)
 
 # Callback types wired by the integrations module
 HumanForwardHandler = Callable[[ChatSession, str], Awaitable[None]]
-# (session, question, context, agent_label) -> human's answer text
-ConsultationHandler = Callable[[ChatSession, str, str, str], Awaitable[str]]
 EmitFn = Callable[[dict], Awaitable[None]]
+# (session, question, context, agent_label, emit) -> human's answer text.
+# *emit* is the live SSE event sink (None on non-streaming turns) so the
+# handler can surface consultation progress to the chat UI.
+ConsultationHandler = Callable[[ChatSession, str, str, str, EmitFn | None], Awaitable[str]]
+
+# Interval between SSE keepalive pings when the pipeline produces no events
+# (human consultation wait, non-streaming sub-agent runs, guardrail LLM calls).
+# Keeps bytes on the wire so proxies don't cut the idle connection.
+STREAM_KEEPALIVE_SECONDS = 15.0
 
 _HANDOFF_ACK = (
     "Um atendente humano está cuidando desta conversa. Sua mensagem foi encaminhada."
@@ -204,7 +211,13 @@ class ChatService:
         task = asyncio.create_task(pipeline())
         try:
             while True:
-                event = await queue.get()
+                try:
+                    event = await asyncio.wait_for(
+                        queue.get(), timeout=STREAM_KEEPALIVE_SECONDS
+                    )
+                except TimeoutError:
+                    yield {"type": "ping"}
+                    continue
                 if event is None:
                     break
                 yield event
@@ -282,7 +295,7 @@ class ChatService:
             session_id=session.id,
             vector_store=self.vector_store,
             graph_store=self.graph_store,
-            consult=self._make_consult(session),
+            consult=self._make_consult(session, emit),
             on_step_start=(
                 (lambda tool, args: emit({"type": "step_started", "tool": tool, "args": args}))
                 if emit
@@ -370,13 +383,13 @@ class ChatService:
             raise ChatServiceError("No enabled router agent configured", 503)
         return router
 
-    def _make_consult(self, session: ChatSession):
+    def _make_consult(self, session: ChatSession, emit: EmitFn | None = None):
         """Human-in-the-loop consultation — the agent stays in charge (no handoff)."""
         handler = self.consultation_handler
         if handler is None:
             return None
 
         async def consult(question: str, context: str, agent_label: str) -> str:
-            return await handler(session, question, context, agent_label)
+            return await handler(session, question, context, agent_label, emit)
 
         return consult

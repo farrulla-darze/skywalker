@@ -1,6 +1,12 @@
 import { useState } from "react";
 import type { StepRecord } from "../api/types";
 
+export interface ConsultationState {
+  status: "waiting" | "answered" | "timeout";
+  elapsed_s?: number;
+  answered_by?: string | null;
+}
+
 export interface LiveStep {
   tool: string;
   args?: Record<string, unknown> | null;
@@ -65,15 +71,33 @@ function StepDetail({ step, depth = 0 }: { step: LiveStep | StepRecord; depth?: 
   );
 }
 
+function fmtElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m${String(seconds % 60).padStart(2, "0")}s`;
+}
+
+function consultationHint(consultation: ConsultationState): string {
+  if (consultation.status === "waiting") {
+    return `aguardando especialista no Telegram · ${fmtElapsed(consultation.elapsed_s ?? 0)}`;
+  }
+  if (consultation.status === "answered") {
+    const who = consultation.answered_by ? ` · @${consultation.answered_by}` : "";
+    return `especialista respondeu${who}`;
+  }
+  return "sem resposta do especialista";
+}
+
 /** Live rail while the agent works; collapses to a one-line summary after. */
 export default function ToolRail({
   steps,
   running,
   totalMs,
+  consultation,
 }: {
   steps: LiveStep[];
   running: boolean;
   totalMs?: number;
+  consultation?: ConsultationState | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (steps.length === 0 && !running) return null;
@@ -93,6 +117,9 @@ export default function ToolRail({
             <span className={step.running ? "text-fg" : "text-mut"}>
               {stepLabel(step.tool)}
             </span>
+            {step.tool === "consult_human" && step.running && consultation && (
+              <span className="text-faint">{consultationHint(consultation)}</span>
+            )}
             {!step.running && step.duration_ms !== undefined && (
               <span className="text-faint">{(step.duration_ms / 1000).toFixed(1)}s</span>
             )}

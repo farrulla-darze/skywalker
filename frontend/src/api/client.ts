@@ -52,7 +52,15 @@ export async function api<T>(
 }
 
 export interface StreamEvent {
-  type: "step_started" | "step_finished" | "token" | "revised" | "done" | "error";
+  type:
+    | "step_started"
+    | "step_finished"
+    | "token"
+    | "revised"
+    | "consultation"
+    | "ping"
+    | "done"
+    | "error";
   [key: string]: unknown;
 }
 

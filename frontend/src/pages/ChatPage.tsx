@@ -6,7 +6,7 @@ import ChatInput from "../components/ChatInput";
 import MessageBody from "../components/MessageBody";
 import MessageActions from "../components/MessageActions";
 import SessionRating from "../components/SessionRating";
-import ToolRail, { type LiveStep } from "../components/ToolRail";
+import ToolRail, { type ConsultationState, type LiveStep } from "../components/ToolRail";
 import { useAuth } from "../context/AuthContext";
 import { useSessions } from "../context/SessionsContext";
 
@@ -19,6 +19,10 @@ const SUGGESTIONS = [
 interface StreamingState {
   steps: LiveStep[];
   text: string;
+  /** Live human-consultation progress (Telegram escalation), if any. */
+  consultation?: ConsultationState | null;
+  /** True while polling for the result after the SSE connection dropped. */
+  reconnecting?: boolean;
 }
 
 /** A step that fires while an `agent:` delegate step is still running belongs to it. */
@@ -57,8 +61,31 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streaming]);
 
+  /** The SSE connection died mid-turn. The backend keeps running the turn to
+   * completion, so poll until the assistant reply lands instead of freezing. */
+  async function recoverDroppedStream(id: string, prevNonUserCount: number) {
+    setStreaming((s) => s && { ...s, reconnecting: true });
+    for (let attempt = 0; attempt < 60; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      try {
+        const msgs = await api<ChatMessageRead[]>(`/api/v1/chat/sessions/${id}/messages`);
+        if (msgs.filter((m) => m.role !== "user").length > prevNonUserCount) {
+          setMessages(msgs);
+          setStreaming(null);
+          void refresh();
+          return;
+        }
+      } catch {
+        /* transient — keep polling */
+      }
+    }
+    setStreaming(null);
+    await loadMessages(id);
+  }
+
   async function send(text: string) {
     sendingRef.current = true;
+    const prevNonUserCount = messages.filter((m) => m.role !== "user").length;
     let id = sessionId;
     if (!id) {
       const session = await api<ChatSessionRead>("/api/v1/chat/sessions", {
@@ -87,6 +114,7 @@ export default function ChatPage() {
     ]);
     setStreaming({ steps: [], text: "" });
 
+    let finished = false;
     try {
       for await (const event of apiStream(
         `/api/v1/chat/sessions/${id}/messages/stream`,
@@ -114,7 +142,7 @@ export default function ChatPage() {
             const idx = steps.findLastIndex(
               (st) => st.tool === (event.tool as string) && st.running,
             );
-            const finished: LiveStep = {
+            const finishedStep: LiveStep = {
               tool: event.tool as string,
               args: (event.args as Record<string, unknown>) ?? null,
               result_preview: event.result_preview as string,
@@ -126,23 +154,44 @@ export default function ChatPage() {
                   ? steps[idx].nested
                   : isSubStep(event.tool as string, steps),
             };
-            if (idx >= 0) steps[idx] = finished;
-            else steps.push(finished);
-            return { ...s, steps };
+            if (idx >= 0) steps[idx] = finishedStep;
+            else steps.push(finishedStep);
+            return {
+              ...s,
+              steps,
+              // The consult step is over — drop its live progress line
+              consultation:
+                (event.tool as string) === "consult_human" ? null : s.consultation,
+            };
           });
         } else if (event.type === "token") {
           setStreaming((s) => s && { ...s, text: s.text + (event.delta as string) });
         } else if (event.type === "revised") {
           setStreaming((s) => s && { ...s, text: event.content as string });
+        } else if (event.type === "consultation") {
+          setStreaming(
+            (s) =>
+              s && {
+                ...s,
+                consultation: {
+                  status: event.status as ConsultationState["status"],
+                  elapsed_s: event.elapsed_s as number | undefined,
+                  answered_by: (event.answered_by as string | null) ?? null,
+                },
+              },
+          );
         } else if (event.type === "done" || event.type === "error") {
+          finished = true;
           setStreaming(null);
           await loadMessages(id!);
           void refresh(); // title / handoff badge may have changed
         }
       }
+      // Stream ended without a terminal event (proxy cut, network blip):
+      // the turn is still running server-side — poll for its result.
+      if (!finished) await recoverDroppedStream(id!, prevNonUserCount);
     } catch {
-      setStreaming(null);
-      await loadMessages(id!);
+      await recoverDroppedStream(id!, prevNonUserCount);
     } finally {
       sendingRef.current = false;
     }
@@ -216,7 +265,14 @@ export default function ChatPage() {
               <ToolRail
                 steps={streaming.steps}
                 running={streaming.text === ""}
+                consultation={streaming.consultation ?? null}
               />
+              {streaming.reconnecting && (
+                <div className="py-0.5 font-monoui text-[12px] text-faint">
+                  conexão instável — o agente continua trabalhando, recuperando a
+                  resposta…
+                </div>
+              )}
               {streaming.text && (
                 <MessageBody content={streaming.text} caret />
               )}

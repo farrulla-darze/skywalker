@@ -322,6 +322,17 @@ Router cobrem como "cenários que escalam": qualquer coisa que toque autorizaç�
 liberação de dinheiro. Perguntas de produto, taxa pública ou status de conta **não** escalam — são
 resolvidas por retrieval/consulta direta.
 
+**Resiliência do turno em stream:** enquanto o turno aguarda o humano, a conexão SSE (`/stream`) não fica
+muda — o backend emite um evento `consultation` (`waiting` com segundos decorridos a cada poll de 2s,
+depois `answered`/`timeout`) e um `ping` de keepalive a cada 15s sempre que não há evento natural (mesmo
+mecanismo cobre esperas em specialists não-streaming e chamadas de guardrail). O frontend renderiza esse
+progresso em vez de congelar a tela (`ToolRail` mostra "aguardando especialista no Telegram · Ns"); se a
+conexão cair mesmo assim (proxy, rede instável), o cliente volta a fazer polling em
+`GET .../messages` até a resposta persistir — o turno em si nunca é cancelado no servidor (`ChatService.
+run_turn_streaming` já rodava em background de forma independente da conexão; o que faltava era o cliente
+não ficar mudo ou travado quando isso acontecia). `docker/nginx.conf` desliga buffering e sobe
+`proxy_read_timeout` para acomodar o keepalive.
+
 ---
 
 ## Telegram (canal de chat e escalação)
@@ -367,7 +378,9 @@ te-lo é literalmente uma conversa dentro do app do Telegram:
    algo que force uma consulta (ex.: *"preciso de um desconto na taxa"* ou *"libera minha transferência
    bloqueada"*). O agente pausa, uma mensagem chega no chat de suporte com a pergunta e o contexto; para
    responder, **basta usar "Responder" (reply) na mensagem do Telegram** — a resposta é entregue de volta
-   ao agente, que retoma a conversa com o cliente usando essa informação.
+   ao agente, que retoma a conversa com o cliente usando essa informação. Enquanto isso, quem estiver no
+   chat web vê o passo `consult_human` ativo com o tempo de espera ao vivo, em vez da tela congelar até o
+   fim do turno.
 
 Slack aparece na biblioteca de integrações (`GET /api/v1/integrations/catalog`) como canal declarado —
 mesmo contrato de integração, cliente diferente — mas sem implementação hoje; o Telegram foi escolhido
@@ -626,3 +639,9 @@ Transparência sobre o que ainda não está feito, para não sobre-vender o que 
   backend compartilhado (Redis) antes de rodar com múltiplos workers/réplicas.
 - **`tests/integration/` está vazio** — a estratégia está descrita em [Testes](#testes), mas a
   implementação (stack real em CI) ainda não existe.
+- **`consult_human` disparado a partir de uma conversa no Telegram pode travar até o timeout** — o loop
+  de long-polling (`app/modules/integrations/polling.py`) despacha updates serialmente numa única task;
+  se o cliente que aciona `consult_human` está nesse mesmo canal, a task que precisaria processar a
+  resposta do humano (outro update) fica bloqueada esperando o próprio turno terminar. O chat web é
+  isento — lá a espera roda numa task por request. Corrigir exigiria despachar updates do Telegram em
+  tasks concorrentes em vez de sequenciais.

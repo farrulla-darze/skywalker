@@ -72,6 +72,28 @@ async def test_wait_times_out_when_no_answer(db):
     assert answered is None
 
 
+async def test_wait_reports_progress_via_on_wait_tick(db):
+    async with db.session_factory() as session:
+        repository = IntegrationsRepository(session)
+        consultation = await repository.save_consultation(
+            HumanConsultation(session_id="s1", question="q", context="c")
+        )
+        service = TelegramService(repository, SETTINGS)
+
+    ticks: list[float] = []
+
+    async def on_tick(elapsed: float) -> None:
+        ticks.append(elapsed)
+
+    service.CONSULTATION_POLL_SECONDS = 0.1
+    answered = await service.wait_for_consultation_answer(
+        consultation.id, db.session_factory, timeout_seconds=0.5, on_wait_tick=on_tick
+    )
+    assert answered is None
+    assert len(ticks) >= 2
+    assert ticks == sorted(ticks)  # elapsed grows monotonically
+
+
 async def test_consult_tool_passes_agent_label_via_ctx_callback():
     calls: list[tuple[str, str, str]] = []
 

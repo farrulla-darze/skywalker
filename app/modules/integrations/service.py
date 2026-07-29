@@ -14,6 +14,7 @@ import asyncio
 import logging
 import secrets
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC
 
 from app.core.config import Settings
@@ -272,15 +273,23 @@ class TelegramService:
         return consultation
 
     async def wait_for_consultation_answer(
-        self, consultation_id: str, session_factory, timeout_seconds: float
+        self,
+        consultation_id: str,
+        session_factory,
+        timeout_seconds: float,
+        on_wait_tick: Callable[[float], Awaitable[None]] | None = None,
     ) -> HumanConsultation | None:
         """Block until the human replies (webhook/polling writes the answer) or timeout.
 
         Polls the DB with fresh sessions — the answer is written by a different
         task (webhook request or polling loop), so the waiting turn must not
         reuse its own session's identity map.
+
+        *on_wait_tick(elapsed_seconds)* is invoked after each unanswered poll so
+        callers can surface wait progress (e.g. SSE events to the chat UI).
         """
-        deadline = asyncio.get_event_loop().time() + timeout_seconds
+        start = asyncio.get_event_loop().time()
+        deadline = start + timeout_seconds
         while asyncio.get_event_loop().time() < deadline:
             await asyncio.sleep(self.CONSULTATION_POLL_SECONDS)
             async with session_factory() as fresh:
@@ -289,6 +298,11 @@ class TelegramService:
                 )
                 if consultation and consultation.status == "answered":
                     return consultation
+            if on_wait_tick is not None:
+                try:
+                    await on_wait_tick(asyncio.get_event_loop().time() - start)
+                except Exception:  # noqa: BLE001 — progress ticks are best-effort
+                    logger.debug("Consultation wait tick failed", exc_info=True)
         return None
 
     # ------------------------------------------------------------------
