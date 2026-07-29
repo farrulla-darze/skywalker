@@ -76,6 +76,10 @@ app/modules/<module_name>/
 
 All services must be runnable through Docker.
 
+> In this repo, `docker/docker-compose.yml` resolves its default `.env` relative to `docker/`, not the
+> repo root. Always run `docker compose --env-file .env -f docker/docker-compose.yml up --build` from
+> the repo root — omitting `--env-file` silently blanks env substitutions and the API fails to boot.
+
 A `docker/` folder should contain:
 
 - `Dockerfile`
@@ -178,6 +182,11 @@ poetry run black app
 ```bash
 poetry run pytest
 ```
+
+> This repo does not have `pytest-cov` configured — `--cov=app` below is aspirational per this
+> template, not enforced today. Tests need no external services: SQLite in-memory DB, PydanticAI
+> `TestModel` standing in for the LLM, and `langfuse_enabled`/`graph_enabled` forced `False` in
+> `tests/conftest.py`.
 
 ### Coverage
 
@@ -373,3 +382,17 @@ All configuration must be loaded through:
 Never change request/response schemas without:
 1. **versioning the endpoint**, or
 2. **explicitly documenting the breaking change**
+
+---
+
+## Stack Specifics (this repo)
+
+- Agent framework: **PydanticAI** (not LangChain). Agents are DB records
+  (`app/modules/agents/models.py`), idempotently reseeded from `app/modules/agents/seeds.py` on every
+  boot by slug. Edit that file to change a system agent's prompt in code, or promote a new version in
+  the Langfuse UI (label `production`) to override at runtime without redeploy (~60s cache TTL).
+- Vector store: **Qdrant**. Graph store: **Neo4j** (optional, `GRAPH_ENABLED=false` by default).
+  Observability + prompt management: **Langfuse**.
+- Tool handlers must read customer identity from `ToolRunContext.user_ref` — never from an
+  LLM-supplied parameter. This is the established anti-IDOR pattern; follow it for any new tool.
+- No `.github/workflows/` exists — CI is not implemented; don't assume PR checks run anywhere.
