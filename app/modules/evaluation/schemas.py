@@ -25,6 +25,7 @@ class GoldenItemCreate(BaseModel):
     expected_route: ExpectedRoute | None = None
     expected_tools: list[str] = Field(default_factory=list)
     provenance: Provenance = Provenance.HANDCRAFTED
+    meta: dict = Field(default_factory=dict)
     reviewed_by: str | None = None
 
 
@@ -37,6 +38,7 @@ class GoldenItemUpdate(BaseModel):
     expected_tools: list[str] | None = None
     category: GoldenCategory | None = None
     difficulty: Difficulty | None = None
+    meta: dict | None = None
     archived: bool | None = None
     reviewed_by: str | None = None
 
@@ -55,6 +57,7 @@ class GoldenItemRead(BaseModel):
     expected_route: ExpectedRoute | None
     expected_tools: list[str]
     provenance: Provenance
+    meta: dict
     reviewed_by: str | None
     source_message_id: str | None
     archived: bool

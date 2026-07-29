@@ -101,7 +101,9 @@ class EvaluationService:
         """Push the golden dataset into Langfuse (dataset 'getnet-qa-v1')."""
         from .langfuse_experiments import ExperimentUnavailableError, sync_golden_dataset
 
-        items = await self.repository.list_items()
+        # Include archived items so removing one from the active set also
+        # archives its previously-synced copy in Langfuse.
+        items = await self.repository.list_items(include_archived=True)
         try:
             return sync_golden_dataset(items)
         except ExperimentUnavailableError as exc:
@@ -147,10 +149,10 @@ class EvaluationService:
         Creates a Langfuse Dataset Run (one trace per item + scores); the local
         EvalRun row stores the aggregates for the frontend comparison table.
         """
-        from .langfuse_experiments import ExperimentUnavailableError, run_ragas_experiment
+        from .langfuse_experiments import ExperimentUnavailableError, run_qa_experiment
 
         try:
-            result = await run_ragas_experiment(
+            result = await run_qa_experiment(
                 self.settings, run_name=payload.name, top_k=payload.top_k
             )
         except ExperimentUnavailableError as exc:

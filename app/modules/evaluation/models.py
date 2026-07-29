@@ -37,6 +37,9 @@ class GoldenItem(Base):
     provenance: Mapped[str] = mapped_column(
         String(30), default=Provenance.HANDCRAFTED, nullable=False
     )
+    # Free-form curation metadata (question_type, answer_style, num_source_docs…)
+    # propagated verbatim into the Langfuse dataset item metadata.
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)
     reviewed_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
     source_message_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
