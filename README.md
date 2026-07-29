@@ -6,6 +6,8 @@ Solução para o desafio técnico **"AI Hardcore Engineer — Multi-Agent Suppor
 graph opcional (**Neo4j**), golden dataset com avaliação versionada (**Langfuse**), guardrails no caminho
 de produção e escalação humana real via **Telegram** — sem ngrok, sem túnel, funcionando no `localhost`.
 
+**Video presentation:** https://drive.google.com/file/d/1dYqGsvGB8BZA3vzWwh2xdOV46p722I4k/view?usp=sharing
+
 
 ---
 
