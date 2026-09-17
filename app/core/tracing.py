@@ -53,11 +53,16 @@ def setup_tracing(settings: Settings) -> bool:
         Langfuse(
             public_key=settings.langfuse_public_key,
             secret_key=settings.langfuse_secret_key,
-            host=settings.langfuse_host,
+            base_url=settings.langfuse_base_url,
+            environment=settings.environment,
         )
         Agent.instrument_all()
         _initialized = True
-        logger.info("Langfuse tracing enabled (host=%s)", settings.langfuse_host)
+        logger.info(
+            "Langfuse tracing enabled (base_url=%s, environment=%s)",
+            settings.langfuse_base_url,
+            settings.environment,
+        )
         return True
     except Exception as exc:  # noqa: BLE001 — observability must never break the app
         logger.error("Failed to initialize Langfuse tracing: %s", exc)

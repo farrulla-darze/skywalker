@@ -78,7 +78,10 @@ class Settings(BaseSettings):
     langfuse_enabled: bool = False
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
-    langfuse_host: str = "http://localhost:3000"
+    # LANGFUSE_BASE_URL is the current SDK v4 env var; defaults to the local
+    # self-hosted stack from docker-compose. Point it at Langfuse Cloud
+    # (e.g. https://us.cloud.langfuse.com) to use the hosted product instead.
+    langfuse_base_url: str = "http://localhost:3000"
 
 
 @lru_cache
