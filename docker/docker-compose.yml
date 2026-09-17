@@ -147,7 +147,8 @@ services:
     restart: unless-stopped
 
   langfuse-minio:
-    image: minio/minio
+    # minio/minio was pulled from Docker Hub (MinIO's 2025 licensing change) — mirrored on quay.io.
+    image: quay.io/minio/minio
     container_name: langfuse-minio
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
